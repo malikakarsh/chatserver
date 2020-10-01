@@ -1,44 +1,52 @@
-from twisted.internet import reactor
-from twisted.internet.protocol import Factory, Protocol
+import socket, threading, pickle
 
-class IChatServ(Protocol):
-    def connectionMade(self):
-        self.factory.clients.append(self);
-	print "Connected Clients are:", self.factory.clients
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+PORT = 5558
+SERVER = socket.gethostbyname(socket.gethostname())
+s.bind((SERVER, PORT))
+print("Welcome to chat-server")
 
-    def connectionLost(self, reason):
-	print "Somebody left" 
+users = []
 
-    def dataReceived(self, data):
-	a = data.split(':')
-	print a
-	if len(a) > 1:
-	    command = a[0]
-	    content = a[1]
-	
-       	    msg = ""
-	    if command == "iam":
-		koil = content.split('\\n')
-                self.name = koil[0]
-		msg = self.name + " has joined the room."
-	
-	    elif command == "msg":
-		msg = self.name + " says: " + content
-		print msg
-	
-	    for c in self.factory.clients:
-		c.message(msg)
+def client(client_socket, addr, USER):
+    while True:
+        try:
+            msg = client_socket.recv(1024)
+            user , message = pickle.loads(msg)
 
-    def message(self,message):
-	self.transport.write(message + '\n')
-
-factory = Factory()
-factory.clients = []
-factory.protocol = IChatServ
-reactor.listenTCP(1234, factory)
-print "Iphone chat server started" 
-reactor.run()
+            if message == 'down()':
+                users.remove(client_socket)
+                for client in users:
+                    client.send(pickle.dumps((user,"Left")))
+                
+                users.remove(user)
+                
+            
 
 
+            for client in users:
+                client.send(pickle.dumps((user,message)))        
+                   
+        except:
+            print("Brute force close")
+            
+                
+def threads():
+    s.listen()
+    while True:
+        try:
+            client_socket, addr = s.accept()
+            user = client_socket.recv(1024).decode('utf-8')
 
-
+            
+            users.append(client_socket)
+                        
+            thread = threading.Thread(target=client, args=(client_socket, addr, user))
+            thread.start()
+            client_socket.send("jibrish".encode('utf-8'))
+        
+        except:
+            s.close()
+            
+print("\033[1;32m[STARTING] Server!\033[0m \033[;1m")
+threads()
